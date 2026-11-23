@@ -1,139 +1,67 @@
 import java.util.Random;
-import java.util.Scanner;
 
 public class Roleta extends Jogo {
+    private Random random = new Random();
+    private int ultimoNumeroSorteado = -1;
+    private String ultimaCorSorteada = "";
 
-    private final Scanner scanner = new Scanner(System.in);
-    private final Random random = new Random();
+    public Roleta() { super("Roleta"); }
 
-    public Roleta() {
-        super("Roleta");
-    }
-
+    // escolha: "numero:17", "cor:vermelho", "cor:preto", "par" ou "impar".
     @Override
-    public Partida Jogar(Cliente cliente, int aposta) {
-        // Validações da aposta
-        if (aposta < getApostaMinima()) {
-            System.out.println("Aposta inválida. A aposta mínima é " + getApostaMinima() + ".");
-            return null;
-        }
-        if (cliente.getSaldo() < aposta) {
-            System.out.println("Saldo insuficiente para essa aposta.");
-            return null;
-        }
-
-        System.out.println("\n=== ROLETA ===");
-        System.out.println("1 - Número (paga 36 para 1)");
-        System.out.println("2 - Cor: vermelho ou preto (paga 2 para 1)");
-        System.out.println("3 - Par ou ímpar (paga 2 para 1)");
-        int tipo = lerInteiro("Escolha o tipo de aposta: ", 1, 3);
-
+    public Partida jogar(Cliente cliente, int aposta, String escolha) {
+        validarAposta(cliente, aposta);
+        if (escolha == null) throw new IllegalArgumentException("Escolha obrigatoria.");
+        String opcao = escolha.trim().toLowerCase().replace("í", "i");
         int numeroEscolhido = -1;
-        String corEscolhida = null;
-        String paridadeEscolhida = null;
+        int multiplicador;
 
-        switch (tipo) {
-            case 1:
-                numeroEscolhido = lerInteiro("Escolha um número (0 a 36): ", 0, 36);
-                break;
-            case 2:
-                corEscolhida = lerOpcao("Escolha a cor (vermelho/preto): ", "vermelho", "preto");
-                break;
-            default:
-                paridadeEscolhida = lerOpcao("Escolha (par/impar): ", "par", "impar");
-                break;
-        }
-
-        // Gira a roleta: 0 a 36
-        int sorteado = random.nextInt(37);
-        String corSorteada = corDoNumero(sorteado);
-        System.out.println("\nA bola parou no " + sorteado + " (" + corSorteada + ")");
-
-        boolean ganhou;
-        int multiplicador; // total devolvido por ficha apostada (36 para 1, 2 para 1)
-
-        switch (tipo) {
-            case 1:
-                ganhou = (sorteado == numeroEscolhido);
-                multiplicador = 36;
-                break;
-            case 2:
-                ganhou = corSorteada.equals(corEscolhida);
-                multiplicador = 2;
-                break;
-            default:
-                // O zero não é par nem ímpar para fins de aposta
-                if (sorteado == 0) {
-                    ganhou = false;
-                } else if (paridadeEscolhida.equals("par")) {
-                    ganhou = (sorteado % 2 == 0);
-                } else {
-                    ganhou = (sorteado % 2 != 0);
-                }
-                multiplicador = 2;
-                break;
-        }
-
-        // Variação de fichas: ganho líquido ou perda da aposta
-        int variacaoSaldo;
-        String resultado;
-        if (ganhou) {
-            variacaoSaldo = aposta * (multiplicador - 1);
-            resultado = "VITORIA";
-            System.out.println("Você ganhou " + variacaoSaldo + " fichas!");
+        if (opcao.startsWith("numero:")) {
+            try {
+                numeroEscolhido = Integer.parseInt(opcao.substring(7));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Numero invalido (0 a 36).");
+            }
+            if (numeroEscolhido < 0 || numeroEscolhido > 36) {
+                throw new IllegalArgumentException("Numero invalido (0 a 36).");
+            }
+            multiplicador = 36;
+        } else if (opcao.equals("cor:vermelho") || opcao.equals("cor:preto")
+                || opcao.equals("par") || opcao.equals("impar")) {
+            multiplicador = 2;
         } else {
-            variacaoSaldo = -aposta;
-            resultado = "DERROTA";
-            System.out.println("Você perdeu " + aposta + " fichas.");
+            throw new IllegalArgumentException("Escolha de roleta invalida.");
         }
 
-        // Atualiza saldo do cliente
-        cliente.atualizarSaldo(variacaoSaldo);
-        System.out.println("Novo saldo: " + cliente.getSaldo());
-
-        // Registra a partida
-        Partida partida = new Partida(aposta, resultado, variacaoSaldo);
+        ultimoNumeroSorteado = random.nextInt(37);
+        ultimaCorSorteada = corDoNumero(ultimoNumeroSorteado);
+        boolean ganhou;
+        if (numeroEscolhido >= 0) {
+            ganhou = ultimoNumeroSorteado == numeroEscolhido;
+        } else if (opcao.startsWith("cor:")) {
+            ganhou = ultimaCorSorteada.equals(opcao.substring(4));
+        } else {
+            ganhou = ultimoNumeroSorteado != 0 &&
+                    ((opcao.equals("par") && ultimoNumeroSorteado % 2 == 0)
+                    || (opcao.equals("impar") && ultimoNumeroSorteado % 2 != 0));
+        }
+        long calculo = ganhou ? (long) aposta * (multiplicador - 1) : -aposta;
+        if (calculo > Integer.MAX_VALUE) throw new IllegalArgumentException("Valor da aposta muito alto.");
+        int variacao = (int) calculo;
+        cliente.atualizarSaldo(variacao);
+        Partida partida = new Partida(aposta, ganhou ? "VITORIA" : "DERROTA", variacao);
         cliente.adicionarPartida(partida);
-        registarPartida();
+        registrarPartida();
         return partida;
     }
 
-    // ===================== Métodos auxiliares =====================
+    public int getUltimoNumeroSorteado() { return ultimoNumeroSorteado; }
+    public String getUltimaCorSorteada() { return ultimaCorSorteada; }
 
-    // 0 = verde; 1-36 alternam entre vermelho (ímpares) e preto (pares)
     private String corDoNumero(int numero) {
-        if (numero == 0) {
-            return "verde";
-        }
-        return (numero % 2 != 0) ? "vermelho" : "preto";
-    }
-
-    private int lerInteiro(String mensagem, int min, int max) {
-        while (true) {
-            System.out.print(mensagem);
-            String entrada = scanner.nextLine().trim();
-            try {
-                int valor = Integer.parseInt(entrada);
-                if (valor >= min && valor <= max) {
-                    return valor;
-                }
-            } catch (NumberFormatException e) {
-                // cai na mensagem de erro abaixo
-            }
-            System.out.println("Entrada inválida. Digite um número entre " + min + " e " + max + ".");
-        }
-    }
-
-    private String lerOpcao(String mensagem, String opcaoA, String opcaoB) {
-        while (true) {
-            System.out.print(mensagem);
-            String entrada = scanner.nextLine().trim().toLowerCase();
-            // aceita "ímpar" com acento também
-            entrada = entrada.replace("í", "i");
-            if (entrada.equals(opcaoA) || entrada.equals(opcaoB)) {
-                return entrada;
-            }
-            System.out.println("Opção inválida. Digite " + opcaoA + " ou " + opcaoB + ".");
-        }
+        if (numero == 0) return "verde";
+        int[] vermelhos = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36};
+        for (int vermelho : vermelhos) if (numero == vermelho) return "vermelho";
+        return "preto";
     }
 }

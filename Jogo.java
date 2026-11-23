@@ -3,28 +3,25 @@ public abstract class Jogo {
     private int apostaMinima;
     private int totalPartidas;
 
-    public Jogo(String nome){
+    public Jogo(String nome) {
         this.nome = nome;
         this.apostaMinima = 1;
         this.totalPartidas = 0;
     }
 
-    public String getNome(){
-        return nome;
+    public String getNome() { return nome; }
+    public int getApostaMinima() { return apostaMinima; }
+    public int getTotalPartidas() { return totalPartidas; }
+    public void registrarPartida() { totalPartidas++; }
+
+    protected void validarAposta(Cliente cliente, int aposta) {
+        if (cliente == null) throw new IllegalArgumentException("Cliente inexistente.");
+        if (aposta < apostaMinima || aposta > cliente.getSaldo()) {
+            throw new IllegalArgumentException("Aposta invalida ou saldo insuficiente.");
+        }
     }
 
-    public int getApostaMinima(){
-        return apostaMinima;
-    }
-
-    public int getTotalPartidas(){
-        return totalPartidas;
-    }
-
-    public void registarPartida(){
-        totalPartidas++;
-    }
-
-    public abstract Partida Jogar(Cliente cliente, int aposta);
-
+    // Retorna null enquanto uma partida ainda nao terminou (Blackjack).
+    // A interface chama este metodo com a escolha do usuario.
+    public abstract Partida jogar(Cliente cliente, int aposta, String escolha);
 }
